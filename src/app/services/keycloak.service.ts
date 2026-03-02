@@ -155,7 +155,7 @@ export class AuthService {
     
     const body = new URLSearchParams({
       grant_type: 'password',
-      client_id: 'admin-cli',
+      client_id: 'actia-app',
       username: environment.admin.username,
       password: environment.admin.password
     });
