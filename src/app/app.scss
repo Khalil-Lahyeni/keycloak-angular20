@@ -1,0 +1,77 @@
+﻿.app-header {
+  background: linear-gradient(135deg, #4a90d9 0%, #357abd 100%);
+  color: white;
+  padding: 1rem 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  text-decoration: none;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.nav-links a {
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity 0.3s ease;
+}
+
+.nav-links a:hover {
+  opacity: 0.8;
+}
+
+.username {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+}
+
+.btn-logout {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.btn-logout:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.main-content {
+  min-height: calc(100vh - 140px);
+  background: #f5f7fa;
+}
+
+.app-footer {
+  background: #333;
+  color: #aaa;
+  text-align: center;
+  padding: 1rem;
+}
+
+.app-footer p {
+  margin: 0;
+  font-size: 0.9rem;
+}
