@@ -1,49 +1,38 @@
-server:
-  port: 8888
+package com.fleetmanagement.gateway.config;
 
-spring:
-  application:
-    name: api-gateway
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.web.server.SecurityWebFilterChain;
 
-  # ── Validation JWT via Keycloak ──
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          # Keycloak publie ses clés publiques ici
-          # Le Gateway les utilise pour valider les tokens JWT sans appel réseau
-          jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:fleet-realm}/protocol/openid-connect/certs
+@Configuration
+@EnableWebFluxSecurity
+public class SecurityConfig {
 
-  # ── CORS configuré dans CorsConfig.java ──
+    /**
+     * Configuration de la sécurité :
+     * - Les endpoints publics (actuator/health, actuator/info) sont accessibles sans token
+     * - Tous les autres endpoints nécessitent un JWT valide émis par Keycloak
+     * - Le JWT est validé via la clé publique de Keycloak (jwk-set-uri dans application.yml)
+     */
+    @Bean
+    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+        http
+            .csrf(ServerHttpSecurity.CsrfSpec::disable)
 
-# ── Actuator ──
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health, info
-  endpoint:
-    health:
-      show-details: always
+            .authorizeExchange(exchanges -> exchanges
+                // Endpoints publics
+                .pathMatchers("/actuator/health", "/actuator/info").permitAll()
+                // Tout le reste nécessite une authentification
+                .anyExchange().authenticated()
+            )
 
-# ── Logs ──
-logging:
-  level:
-    com.fleetmanagement.gateway: DEBUG
-    org.springframework.cloud.gateway: INFO
-    org.springframework.security: INFO
+            // Validation JWT via Keycloak (jwk-set-uri configuré dans application.yml)
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(jwt -> {}) // utilise spring.security.oauth2.resourceserver.jwt.jwk-set-uri
+            );
 
----
-# ══════════════════════════════
-# Profil Docker
-# ══════════════════════════════
-spring:
-  config:
-    activate:
-      on-profile: docker
-
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          jwk-set-uri: http://keycloak:8080/realms/${KEYCLOAK_REALM:fleet-realm}/protocol/openid-connect/certs
+        return http.build();
+    }
+}
