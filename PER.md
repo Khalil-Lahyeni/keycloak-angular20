@@ -1,51 +1,39 @@
-package com.fleetmanagement.gateway.config;
+# ══════════════════════════════════════════════
+#  nginx.conf — Frontend Angular
+# ══════════════════════════════════════════════
 
-import org.springframework.cloud.gateway.route.RouteLocator;
-import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+server {
+    listen 80;
+    server_name localhost;
 
-@Configuration
-public class RouteConfig {
+    root /usr/share/nginx/html;
+    index index.html;
 
-    /**
-     * Définition des routes vers les micro-services :
-     *
-     *  /api/collecte/**  →  ms-collecte:8081
-     *  /api/alertes/**   →  ms-alertes:8082
-     *  /api/ml/**        →  ms-ml:8083
-     *
-     * Le filtre StripPrefix=2 supprime le préfixe /api/xxx
-     * avant de transmettre la requête au micro-service.
-     *
-     * Exemple :
-     *   GET /api/collecte/metrics  →  ms-collecte:8081/metrics
-     */
-    @Bean
-    public RouteLocator routeLocator(RouteLocatorBuilder builder) {
-        return builder.routes()
+    # ── Compression ──
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
 
-            // ── MS Collecte / Ingestion ──
-            .route("ms-collecte", route -> route
-                .path("/api/collecte/**")
-                .filters(filter -> filter.stripPrefix(2))
-                .uri("http://ms-collecte:8081")
-            )
+    # ── Angular SPA ──
+    # Toutes les routes Angular sont redirigées vers index.html
+    # (nécessaire pour le routing côté client)
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
 
-            // ── MS Alertes & Notifications ──
-            .route("ms-alertes", route -> route
-                .path("/api/alertes/**")
-                .filters(filter -> filter.stripPrefix(2))
-                .uri("http://ms-alertes:8082")
-            )
+    # ── Proxy vers API Gateway ──
+    # Les appels /api/** sont redirigés vers le Gateway
+    # au lieu d'appeler directement le Gateway depuis Angular
+    location /api/ {
+        proxy_pass http://api-gateway:8888;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 
-            // ── MS ML / Maintenance Prédictive ──
-            .route("ms-ml", route -> route
-                .path("/api/ml/**")
-                .filters(filter -> filter.stripPrefix(2))
-                .uri("http://ms-ml:8083")
-            )
-
-            .build();
+    # ── Cache des assets statiques ──
+    location ~* \.(js|css|png|jpg|ico|woff2)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
     }
 }
