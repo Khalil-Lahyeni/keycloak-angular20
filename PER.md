@@ -1,38 +1,51 @@
 package com.fleetmanagement.gateway.config;
 
+import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
-import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.web.server.SecurityWebFilterChain;
 
 @Configuration
-@EnableWebFluxSecurity
-public class SecurityConfig {
+public class RouteConfig {
 
     /**
-     * Configuration de la sécurité :
-     * - Les endpoints publics (actuator/health, actuator/info) sont accessibles sans token
-     * - Tous les autres endpoints nécessitent un JWT valide émis par Keycloak
-     * - Le JWT est validé via la clé publique de Keycloak (jwk-set-uri dans application.yml)
+     * Définition des routes vers les micro-services :
+     *
+     *  /api/collecte/**  →  ms-collecte:8081
+     *  /api/alertes/**   →  ms-alertes:8082
+     *  /api/ml/**        →  ms-ml:8083
+     *
+     * Le filtre StripPrefix=2 supprime le préfixe /api/xxx
+     * avant de transmettre la requête au micro-service.
+     *
+     * Exemple :
+     *   GET /api/collecte/metrics  →  ms-collecte:8081/metrics
      */
     @Bean
-    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-        http
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)
+    public RouteLocator routeLocator(RouteLocatorBuilder builder) {
+        return builder.routes()
 
-            .authorizeExchange(exchanges -> exchanges
-                // Endpoints publics
-                .pathMatchers("/actuator/health", "/actuator/info").permitAll()
-                // Tout le reste nécessite une authentification
-                .anyExchange().authenticated()
+            // ── MS Collecte / Ingestion ──
+            .route("ms-collecte", route -> route
+                .path("/api/collecte/**")
+                .filters(filter -> filter.stripPrefix(2))
+                .uri("http://ms-collecte:8081")
             )
 
-            // Validation JWT via Keycloak (jwk-set-uri configuré dans application.yml)
-            .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> {}) // utilise spring.security.oauth2.resourceserver.jwt.jwk-set-uri
-            );
+            // ── MS Alertes & Notifications ──
+            .route("ms-alertes", route -> route
+                .path("/api/alertes/**")
+                .filters(filter -> filter.stripPrefix(2))
+                .uri("http://ms-alertes:8082")
+            )
 
-        return http.build();
+            // ── MS ML / Maintenance Prédictive ──
+            .route("ms-ml", route -> route
+                .path("/api/ml/**")
+                .filters(filter -> filter.stripPrefix(2))
+                .uri("http://ms-ml:8083")
+            )
+
+            .build();
     }
 }
