@@ -1,55 +1,65 @@
-package com.fleetmanagement.gateway.config;
+package com.fleetmanagement.gateway.controller;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
-import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.oauth2.client.oidc.web.server.logout.OidcClientInitiatedServerLogoutSuccessHandler;
-import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
-import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.web.server.authentication.logout.ServerLogoutSuccessHandler;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
 
-@Configuration
-@EnableWebFluxSecurity
-public class SecurityConfig {
+import java.util.HashMap;
+import java.util.Map;
 
-    private final ReactiveClientRegistrationRepository clientRegistrationRepository;
+@RestController
+@RequestMapping("/api/auth")
+public class UserInfoController {
 
-    public SecurityConfig(ReactiveClientRegistrationRepository clientRegistrationRepository) {
-        this.clientRegistrationRepository = clientRegistrationRepository;
+    /**
+     * Endpoint appelé par Angular pour récupérer les infos utilisateur.
+     *
+     * Angular envoie son cookie SESSION → Gateway lit la session Redis
+     * → retourne les infos du JWT sans jamais exposer le JWT à Angular.
+     *
+     * Réponse :
+     * {
+     *   "sub":                "uuid-keycloak",
+     *   "preferred_username": "john",
+     *   "email":              "john@example.com",
+     *   "given_name":         "John",
+     *   "family_name":        "Doe",
+     *   "roles":              ["OPERATEUR", "..."]
+     * }
+     */
+    @GetMapping("/userinfo")
+    public Mono<Map<String, Object>> userInfo(
+        @AuthenticationPrincipal OidcUser oidcUser
+    ) {
+        Map<String, Object> userInfo = new HashMap<>();
+        userInfo.put("sub",                oidcUser.getSubject());
+        userInfo.put("preferred_username", oidcUser.getPreferredUsername());
+        userInfo.put("email",              oidcUser.getEmail());
+        userInfo.put("given_name",         oidcUser.getGivenName());
+        userInfo.put("family_name",        oidcUser.getFamilyName());
+
+        // Extraction des rôles depuis le token Keycloak
+        Map<String, Object> claims = oidcUser.getClaims();
+        if (claims.containsKey("realm_access")) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> realmAccess = (Map<String, Object>) claims.get("realm_access");
+            userInfo.put("roles", realmAccess.get("roles"));
+        }
+
+        return Mono.just(userInfo);
     }
 
-    @Bean
-    public SecurityWebFilterChain securityFilterChain(ServerHttpSecurity http) {
-        http
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)
-
-            .authorizeExchange(exchanges -> exchanges
-                // Endpoints publics
-                .pathMatchers("/actuator/health", "/actuator/info").permitAll()
-                .pathMatchers("/login/oauth2/code/**").permitAll()
-                .pathMatchers("/oauth2/**").permitAll()
-                // Tout le reste nécessite une session valide
-                .anyExchange().authenticated()
-            )
-
-            .oauth2Login(oauth2 -> oauth2
-                // Après login Keycloak → redirige vers Angular /callback
-                .defaultSuccessUrl("http://localhost:4200/callback", true)
-            )
-
-            .logout(logout -> logout
-                .logoutUrl("/logout")
-                .logoutSuccessHandler(oidcLogoutSuccessHandler())
-            );
-
-        return http.build();
-    }
-
-    private ServerLogoutSuccessHandler oidcLogoutSuccessHandler() {
-        OidcClientInitiatedServerLogoutSuccessHandler handler =
-            new OidcClientInitiatedServerLogoutSuccessHandler(clientRegistrationRepository);
-        handler.setPostLogoutRedirectUri("http://localhost:4200");
-        return handler;
+    /**
+     * Endpoint de login — déclenche la redirection OAuth2 vers Keycloak.
+     * Appelé par le Guard Angular quand la session est expirée.
+     */
+    @GetMapping("/login")
+    public Mono<Void> login() {
+        // Spring Security intercepte cette route et redirige vers Keycloak
+        // si l'utilisateur n'est pas authentifié (configuré dans SecurityConfig)
+        return Mono.empty();
     }
 }
