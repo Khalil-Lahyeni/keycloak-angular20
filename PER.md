@@ -1,20 +1,36 @@
-// src/app/features/dashboard/dashboard.component.ts
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { AuthService } from '../../core/services/auth.service';
+// src/app/app.routes.ts
+import { Routes } from '@angular/router';
+import { authGuard } from './core/guards/auth.guard';
 
-@Component({
-  selector: 'app-dashboard',
-  standalone: true,
-  imports: [CommonModule],
-  templateUrl: './dashboard.html',
-  styleUrl:    './dashboard.scss'
-})
-export class DashboardComponent implements OnInit {
+export const routes: Routes = [
 
-  constructor(public authService: AuthService) {}
+  // ── Page callback après login Keycloak ──
+  {
+    path: 'callback',
+    loadComponent: () =>
+      import('./features/auth/callback/callback')
+        .then(m => m.CallbackComponent)
+  },
 
-  ngOnInit(): void {
-    this.authService.loadUserInfo();
+  // ── Routes protégées par authGuard ──
+  {
+    path: 'dashboard',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/dashboard/dashboard')
+        .then(m => m.DashboardComponent)
+  },
+
+  // ── Redirect par défaut ──
+  {
+    path: '',
+    redirectTo: 'dashboard',
+    pathMatch: 'full'
+  },
+
+  // ── Route inconnue ──
+  {
+    path: '**',
+    redirectTo: 'dashboard'
   }
-}
+];
