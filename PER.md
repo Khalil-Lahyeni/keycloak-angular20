@@ -1,36 +1,49 @@
-// src/app/app.routes.ts
-import { Routes } from '@angular/router';
-import { authGuard } from './core/guards/auth.guard';
+// callback.component.spec.ts
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { Router } from '@angular/router';
+import { CallbackComponent } from './callback';
+import { AuthService } from '../../../core/services/auth.service';
+import { provideRouter } from '@angular/router';
 
-export const routes: Routes = [
+describe('CallbackComponent', () => {
+  let component: CallbackComponent;
+  let fixture:   ComponentFixture<CallbackComponent>;
+  let authServiceMock: jasmine.SpyObj<AuthService>;
+  let routerMock:      jasmine.SpyObj<Router>;
 
-  // ── Page callback après login Keycloak ──
-  {
-    path: 'callback',
-    loadComponent: () =>
-      import('./features/auth/callback/callback')
-        .then(m => m.CallbackComponent)
-  },
+  beforeEach(async () => {
+    authServiceMock = jasmine.createSpyObj('AuthService', ['loadUserInfo']);
+    routerMock      = jasmine.createSpyObj('Router',      ['navigate']);
 
-  // ── Routes protégées par authGuard ──
-  {
-    path: 'dashboard',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/dashboard/dashboard')
-        .then(m => m.DashboardComponent)
-  },
+    await TestBed.configureTestingModule({
+      imports: [CallbackComponent],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: authServiceMock },
+        { provide: Router,      useValue: routerMock      }
+      ]
+    }).compileComponents();
 
-  // ── Redirect par défaut ──
-  {
-    path: '',
-    redirectTo: 'dashboard',
-    pathMatch: 'full'
-  },
+    fixture   = TestBed.createComponent(CallbackComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
 
-  // ── Route inconnue ──
-  {
-    path: '**',
-    redirectTo: 'dashboard'
-  }
-];
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  it('should call loadUserInfo on init', () => {
+    expect(authServiceMock.loadUserInfo).toHaveBeenCalledOnce();
+  });
+
+  it('should redirect to /dashboard after 1 second', fakeAsync(() => {
+    tick(1000);
+    expect(routerMock.navigate).toHaveBeenCalledWith(['/dashboard']);
+  }));
+
+  it('should display spinner', () => {
+    const spinner = fixture.nativeElement.querySelector('.spinner-border');
+    expect(spinner).toBeTruthy();
+  });
+});
