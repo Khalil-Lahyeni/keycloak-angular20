@@ -1,22 +1,25 @@
-// src/app/core/interceptors/auth.interceptor.ts
-import { HttpInterceptorFn } from '@angular/common/http';
-import { environment } from '../../../environments/environment';
+// src/app/features/auth/callback/callback.component.ts
+import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '../../../core/services/auth.service';
 
-/**
- * Intercepteur fonctionnel (Angular Standalone style).
- *
- * Ajoute automatiquement withCredentials: true
- * sur toutes les requêtes vers le Gateway.
- *
- * Cela garantit que le cookie SESSION est toujours envoyé
- * sans avoir à l'écrire manuellement dans chaque service.
- */
-export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  // On ajoute withCredentials uniquement pour les appels vers le Gateway
-  if (req.url.startsWith(environment.apiGatewayUrl)) {
-    const cloned = req.clone({ withCredentials: true });
-    return next(cloned);
+@Component({
+  selector: 'app-callback',
+  standalone: true,
+  templateUrl: './callback.component.html',
+  styleUrl:    './callback.component.scss'
+})
+export class CallbackComponent implements OnInit {
+
+  constructor(
+    private authService: AuthService,
+    private router:      Router
+  ) {}
+
+  ngOnInit(): void {
+    this.authService.loadUserInfo();
+    setTimeout(() => {
+      this.router.navigate(['/dashboard']);
+    }, 1000);
   }
-  return next(req);
-
-};
+}
