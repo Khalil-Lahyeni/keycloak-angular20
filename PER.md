@@ -1,25 +1,20 @@
-// src/app/features/auth/callback/callback.component.ts
+// src/app/features/dashboard/dashboard.component.ts
 import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
-import { AuthService } from '../../../core/services/auth.service';
+import { CommonModule } from '@angular/common';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
-  selector: 'app-callback',
+  selector: 'app-dashboard',
   standalone: true,
-  templateUrl: './callback.component.html',
-  styleUrl:    './callback.component.scss'
+  imports: [CommonModule],
+  templateUrl: './dashboard.html',
+  styleUrl:    './dashboard.scss'
 })
-export class CallbackComponent implements OnInit {
+export class DashboardComponent implements OnInit {
 
-  constructor(
-    private authService: AuthService,
-    private router:      Router
-  ) {}
+  constructor(public authService: AuthService) {}
 
   ngOnInit(): void {
     this.authService.loadUserInfo();
-    setTimeout(() => {
-      this.router.navigate(['/dashboard']);
-    }, 1000);
   }
 }
