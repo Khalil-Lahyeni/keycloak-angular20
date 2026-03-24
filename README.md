@@ -1,26 +1,36 @@
-// src/app/app.config.ts
-import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
-import { provideRouter } from '@angular/router';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+// src/app/app.routes.ts
+import { Routes } from '@angular/router';
+import { authGuard } from './core/guards/auth.guard';
 
-import { routes } from './app.routes';
-import { authInterceptor } from './core/interceptors/auth.interceptor';
+export const routes: Routes = [
 
-export const appConfig: ApplicationConfig = {
-  providers: [
+  // ── Page callback après login Keycloak ──
+  {
+    path: 'callback',
+    loadComponent: () =>
+      import('./features/auth/callback/callback.component')
+        .then(m => m.CallbackComponent)
+  },
 
-    // ── Zone.js optimisé ──
-    provideZoneChangeDetection({ eventCoalescing: true }),
+  // ── Routes protégées par authGuard ──
+  {
+    path: 'dashboard',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/dashboard/dashboard.component')
+        .then(m => m.DashboardComponent)
+  },
 
-    // ── Router ──
-    provideRouter(routes),
+  // ── Redirect par défaut ──
+  {
+    path: '',
+    redirectTo: 'dashboard',
+    pathMatch: 'full'
+  },
 
-    // ── HttpClient avec intercepteur auth ──
-    // authInterceptor ajoute withCredentials: true automatiquement
-    // sur tous les appels vers le Gateway → cookie SESSION envoyé
-    provideHttpClient(
-      withInterceptors([authInterceptor])
-    ),
-
-  ]
-};
+  // ── Route inconnue ──
+  {
+    path: '**',
+    redirectTo: 'dashboard'
+  }
+];
