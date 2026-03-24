@@ -1,49 +1,55 @@
-// callback.component.spec.ts
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { Router } from '@angular/router';
-import { CallbackComponent } from './callback';
-import { AuthService } from '../../../core/services/auth.service';
-import { provideRouter } from '@angular/router';
+package com.fleetmanagement.gateway.config;
 
-describe('CallbackComponent', () => {
-  let component: CallbackComponent;
-  let fixture:   ComponentFixture<CallbackComponent>;
-  let authServiceMock: jasmine.SpyObj<AuthService>;
-  let routerMock:      jasmine.SpyObj<Router>;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.oauth2.client.oidc.web.server.logout.OidcClientInitiatedServerLogoutSuccessHandler;
+import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.authentication.logout.ServerLogoutSuccessHandler;
 
-  beforeEach(async () => {
-    authServiceMock = jasmine.createSpyObj('AuthService', ['loadUserInfo']);
-    routerMock      = jasmine.createSpyObj('Router',      ['navigate']);
+@Configuration
+@EnableWebFluxSecurity
+public class SecurityConfig {
 
-    await TestBed.configureTestingModule({
-      imports: [CallbackComponent],
-      providers: [
-        provideRouter([]),
-        { provide: AuthService, useValue: authServiceMock },
-        { provide: Router,      useValue: routerMock      }
-      ]
-    }).compileComponents();
+    private final ReactiveClientRegistrationRepository clientRegistrationRepository;
 
-    fixture   = TestBed.createComponent(CallbackComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
-  });
+    public SecurityConfig(ReactiveClientRegistrationRepository clientRegistrationRepository) {
+        this.clientRegistrationRepository = clientRegistrationRepository;
+    }
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
-  });
+    @Bean
+    public SecurityWebFilterChain securityFilterChain(ServerHttpSecurity http) {
+        http
+            .csrf(ServerHttpSecurity.CsrfSpec::disable)
 
-  it('should call loadUserInfo on init', () => {
-    expect(authServiceMock.loadUserInfo).toHaveBeenCalledOnce();
-  });
+            .authorizeExchange(exchanges -> exchanges
+                // Endpoints publics
+                .pathMatchers("/actuator/health", "/actuator/info").permitAll()
+                .pathMatchers("/login/oauth2/code/**").permitAll()
+                .pathMatchers("/oauth2/**").permitAll()
+                // Tout le reste nécessite une session valide
+                .anyExchange().authenticated()
+            )
 
-  it('should redirect to /dashboard after 1 second', fakeAsync(() => {
-    tick(1000);
-    expect(routerMock.navigate).toHaveBeenCalledWith(['/dashboard']);
-  }));
+            .oauth2Login(oauth2 -> oauth2
+                // Après login Keycloak → redirige vers Angular /callback
+                .defaultSuccessUrl("http://localhost:4200/callback", true)
+            )
 
-  it('should display spinner', () => {
-    const spinner = fixture.nativeElement.querySelector('.spinner-border');
-    expect(spinner).toBeTruthy();
-  });
-});
+            .logout(logout -> logout
+                .logoutUrl("/logout")
+                .logoutSuccessHandler(oidcLogoutSuccessHandler())
+            );
+
+        return http.build();
+    }
+
+    private ServerLogoutSuccessHandler oidcLogoutSuccessHandler() {
+        OidcClientInitiatedServerLogoutSuccessHandler handler =
+            new OidcClientInitiatedServerLogoutSuccessHandler(clientRegistrationRepository);
+        handler.setPostLogoutRedirectUri("http://localhost:4200");
+        return handler;
+    }
+}
