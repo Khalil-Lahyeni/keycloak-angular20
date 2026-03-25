@@ -1,28 +1,27 @@
-<!-- sidebar.html -->
-<aside
-  class="sidebar bg-white border-end"
-  [class.collapsed]="collapsed"
-  [class.mobile]="isMobile">
+// src/app/shared/layout/sidebar/sidebar.ts
+import { Component, Input } from '@angular/core';
+import { CommonModule }     from '@angular/common';
+import { RouterModule }     from '@angular/router';
 
-  <nav class="sidebar-nav mt-2">
-    <ul class="nav flex-column px-2">
+export interface MenuItem {
+  label: string;
+  icon:  string;
+  route: string;
+}
 
-      <li class="nav-item" *ngFor="let item of menuItems">
-        <a
-          class="nav-link sidebar-link d-flex align-items-center gap-3 rounded"
-          [routerLink]="item.route"
-          routerLinkActive="active">
+@Component({
+  selector: 'app-sidebar',
+  standalone: true,
+  imports: [CommonModule, RouterModule],
+  templateUrl: './sidebar.html',
+  styleUrl:    './sidebar.scss'
+})
+export class SidebarComponent {
+  @Input() collapsed = false;
+  @Input() isMobile  = false;
 
-          <i class="bi {{ item.icon }} fs-5 flex-shrink-0"></i>
-
-          <span class="sidebar-label" *ngIf="!collapsed || isMobile">
-            {{ item.label }}
-          </span>
-
-        </a>
-      </li>
-
-    </ul>
-  </nav>
-
-</aside>
+  readonly menuItems: MenuItem[] = [
+    { label: 'Dashboard',  icon: 'bi-speedometer2', route: '/dashboard'  },
+    { label: 'Paramètres', icon: 'bi-gear',         route: '/parametres' }
+  ];
+}
