@@ -1,55 +1,40 @@
-// app.scss
-$navbar-height:            3.75rem;   // 60px
-$sidebar-width:            15rem;     // 240px
-$sidebar-collapsed-width:  4rem;      // 64px
-$breakpoint-md:            48em;      // 768px
-$breakpoint-sm:            36em;      // 576px
+<!-- navbar.html -->
+<nav class="navbar navbar-light bg-white border-bottom px-3 top-navbar">
 
-// ── Layout global ──
-.app-container {
-  min-height: 100vh;
-  background: #f5f7fa;
-}
+  <!-- ── Gauche : Toggle + Logo ── -->
+  <div class="d-flex align-items-center gap-2">
+    <button
+      class="btn btn-light btn-sm toggle-btn"
+      (click)="onToggleSidebar()"
+      title="Toggle Sidebar">
+      <i class="bi bi-list fs-5"></i>
+    </button>
+    <span class="navbar-brand mb-0 fw-bold text-primary">
+      🚗 <span class="d-none d-sm-inline">Fleet Management</span>
+    </span>
+  </div>
 
-.app-body {
-  display: flex;
-  padding-top: $navbar-height;
-  min-height: calc(100vh - #{$navbar-height});
-}
+  <!-- ── Droite : User + Logout ── -->
+  <div class="d-flex align-items-center gap-2" *ngIf="authService.isLoggedIn()">
 
-// ── Zone de contenu ──
-.app-content {
-  flex: 1;
-  margin-left: $sidebar-width;
-  padding: 1.5rem;
-  transition: margin-left 0.25s ease;
-  min-height: calc(100vh - #{$navbar-height});
+    <!-- Avatar + nom -->
+    <div class="d-flex align-items-center gap-2">
+      <div class="avatar-circle bg-primary text-white">
+        {{ authService.username().charAt(0).toUpperCase() }}
+      </div>
+      <span class="fw-semibold text-dark username-text">
+        {{ authService.username() }}
+      </span>
+    </div>
 
-  &.sidebar-collapsed {
-    margin-left: $sidebar-collapsed-width;
-  }
+    <!-- Bouton logout -->
+    <button
+      class="btn btn-outline-danger btn-sm"
+      (click)="authService.logout()">
+      <i class="bi bi-box-arrow-right"></i>
+      <span class="logout-text ms-1">Déconnexion</span>
+    </button>
 
-  @media (max-width: $breakpoint-md) {
-    margin-left: 0 !important;
-    padding: 1rem;
-  }
+  </div>
 
-  @media (max-width: $breakpoint-sm) {
-    padding: 0.75rem;
-  }
-}
-
-// ── Overlay mobile ──
-.sidebar-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 1015;
-
-  @media (max-width: $breakpoint-md) {
-    &.active {
-      display: block;
-    }
-  }
-}
+</nav>
