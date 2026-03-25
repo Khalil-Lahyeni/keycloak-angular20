@@ -1,40 +1,23 @@
-<!-- navbar.html -->
-<nav class="navbar navbar-light bg-white border-bottom px-3 top-navbar">
+// src/app/shared/layout/navbar/navbar.ts
+import { Component, EventEmitter, Output } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { AuthService } from '../../../core/services/auth.service';
 
-  <!-- ── Gauche : Toggle + Logo ── -->
-  <div class="d-flex align-items-center gap-2">
-    <button
-      class="btn btn-light btn-sm toggle-btn"
-      (click)="onToggleSidebar()"
-      title="Toggle Sidebar">
-      <i class="bi bi-list fs-5"></i>
-    </button>
-    <span class="navbar-brand mb-0 fw-bold text-primary">
-      🚗 <span class="d-none d-sm-inline">Fleet Management</span>
-    </span>
-  </div>
+@Component({
+  selector: 'app-navbar',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './navbar.html',
+  styleUrl:    './navbar.scss'
+})
+export class NavbarComponent {
 
-  <!-- ── Droite : User + Logout ── -->
-  <div class="d-flex align-items-center gap-2" *ngIf="authService.isLoggedIn()">
+  // Permet au parent (app) de toggler la sidebar
+  @Output() toggleSidebar = new EventEmitter<void>();
 
-    <!-- Avatar + nom -->
-    <div class="d-flex align-items-center gap-2">
-      <div class="avatar-circle bg-primary text-white">
-        {{ authService.username().charAt(0).toUpperCase() }}
-      </div>
-      <span class="fw-semibold text-dark username-text">
-        {{ authService.username() }}
-      </span>
-    </div>
+  constructor(public authService: AuthService) {}
 
-    <!-- Bouton logout -->
-    <button
-      class="btn btn-outline-danger btn-sm"
-      (click)="authService.logout()">
-      <i class="bi bi-box-arrow-right"></i>
-      <span class="logout-text ms-1">Déconnexion</span>
-    </button>
-
-  </div>
-
-</nav>
+  onToggleSidebar(): void {
+    this.toggleSidebar.emit();
+  }
+}
