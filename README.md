@@ -1,69 +1,28 @@
-// navbar.spec.ts
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal, computed }          from '@angular/core';
-import { NavbarComponent }           from './navbar';
-import { AuthService }               from '../../../core/services/auth.service';
-import { provideRouter }             from '@angular/router';
+<!-- sidebar.html -->
+<aside
+  class="sidebar bg-white border-end"
+  [class.collapsed]="collapsed"
+  [class.mobile]="isMobile">
 
-function createAuthMock(loggedIn = true) {
-  const _user = signal(loggedIn ? { preferred_username: 'john' } : null);
-  return {
-    isLoggedIn: computed(() => _user() !== null),
-    username:   computed(() => (_user() as any)?.preferred_username ?? ''),
-    logout:     jasmine.createSpy('logout')
-  };
-}
+  <nav class="sidebar-nav mt-2">
+    <ul class="nav flex-column px-2">
 
-describe('NavbarComponent', () => {
-  let component: NavbarComponent;
-  let fixture:   ComponentFixture<NavbarComponent>;
-  let authMock:  ReturnType<typeof createAuthMock>;
+      <li class="nav-item" *ngFor="let item of menuItems">
+        <a
+          class="nav-link sidebar-link d-flex align-items-center gap-3 rounded"
+          [routerLink]="item.route"
+          routerLinkActive="active">
 
-  beforeEach(async () => {
-    authMock = createAuthMock();
+          <i class="bi {{ item.icon }} fs-5 flex-shrink-0"></i>
 
-    await TestBed.configureTestingModule({
-      imports: [NavbarComponent],
-      providers: [
-        provideRouter([]),
-        { provide: AuthService, useValue: authMock }
-      ]
-    }).compileComponents();
+          <span class="sidebar-label" *ngIf="!collapsed || isMobile">
+            {{ item.label }}
+          </span>
 
-    fixture   = TestBed.createComponent(NavbarComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
-  });
+        </a>
+      </li>
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
-  });
+    </ul>
+  </nav>
 
-  it('should display brand name', () => {
-    const brand = fixture.nativeElement.querySelector('.navbar-brand');
-    expect(brand.textContent).toContain('Fleet Management');
-  });
-
-  it('should display username when logged in', () => {
-    const content = fixture.nativeElement.textContent;
-    expect(content).toContain('john');
-  });
-
-  it('should show avatar with first letter of username', () => {
-    const avatar = fixture.nativeElement.querySelector('.avatar-circle');
-    expect(avatar.textContent.trim()).toBe('J');
-  });
-
-  it('should emit toggleSidebar when button clicked', () => {
-    spyOn(component.toggleSidebar, 'emit');
-    const btn = fixture.nativeElement.querySelector('.toggle-btn');
-    btn.click();
-    expect(component.toggleSidebar.emit).toHaveBeenCalled();
-  });
-
-  it('should call logout when button clicked', () => {
-    const btn = fixture.nativeElement.querySelector('.btn-outline-danger');
-    btn.click();
-    expect(authMock.logout).toHaveBeenCalled();
-  });
-});
+</aside>
