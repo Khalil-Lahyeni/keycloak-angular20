@@ -1,37 +1,42 @@
-// src/app/layout/sidebar/sidebar.ts
-import { Component, computed } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
-import { CommonModule } from '@angular/common';
-import { AuthService } from '../../core/services/auth.service';
+<!-- sidebar.html -->
+<aside class="sidebar d-flex flex-column">
 
-interface NavItem {
-  label: string;
-  icon:  string;
-  route: string;
-}
+  <!-- ── Logo ── -->
+  <div class="sidebar-logo">
+    <span class="logo-icon">🚗</span>
+    <span class="logo-text">Fleet</span>
+  </div>
 
-@Component({
-  selector: 'app-sidebar',
-  standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive],
-  templateUrl: './sidebar.html',
-  styleUrl:    './sidebar.scss'
-})
-export class SidebarComponent {
+  <hr class="sidebar-divider" />
 
-  readonly navItems: NavItem[] = [
-    { label: 'Dashboard',   icon: 'bi-speedometer2',  route: '/dashboard'   },
-    { label: 'Équipements', icon: 'bi-cpu',            route: '/equipements' },
-    { label: 'Alertes',     icon: 'bi-bell',           route: '/alertes'     },
-    { label: 'Maintenance', icon: 'bi-tools',          route: '/maintenance' },
-    { label: 'Rapports',    icon: 'bi-bar-chart-line', route: '/rapports'    },
-  ];
+  <!-- ── Navigation ── -->
+  <nav class="sidebar-nav flex-grow-1">
+    <ul class="nav flex-column gap-1">
+      <li class="nav-item" *ngFor="let item of navItems">
+        <a
+          class="nav-link sidebar-link"
+          [routerLink]="item.route"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: item.route === '/dashboard' }">
+          <i class="bi {{ item.icon }} sidebar-icon"></i>
+          <span class="sidebar-label">{{ item.label }}</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
 
-  readonly username = computed(() => this.authService.username());
+  <hr class="sidebar-divider" />
 
-  constructor(public authService: AuthService) {}
+  <!-- ── User + Logout ── -->
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <i class="bi bi-person-circle sidebar-icon"></i>
+      <span class="sidebar-label">{{ username() }}</span>
+    </div>
+    <button class="sidebar-logout" (click)="logout()">
+      <i class="bi bi-box-arrow-left sidebar-icon"></i>
+      <span class="sidebar-label">Sign out</span>
+    </button>
+  </div>
 
-  logout(): void {
-    this.authService.logout();
-  }
-}
+</aside>
