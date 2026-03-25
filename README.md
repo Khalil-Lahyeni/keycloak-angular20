@@ -1,23 +1,58 @@
-// src/app/shared/layout/navbar/navbar.ts
-import { Component, EventEmitter, Output } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { AuthService } from '../../../core/services/auth.service';
+// navbar.scss
+$navbar-height: 3.75rem;  // 60px
+$breakpoint-sm: 36em;     // 576px
 
-@Component({
-  selector: 'app-navbar',
-  standalone: true,
-  imports: [CommonModule],
-  templateUrl: './navbar.html',
-  styleUrl:    './navbar.scss'
-})
-export class NavbarComponent {
+.top-navbar {
+  height: $navbar-height;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1030;
+  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.08);
+}
 
-  // Permet au parent (app) de toggler la sidebar
-  @Output() toggleSidebar = new EventEmitter<void>();
+.toggle-btn {
+  border: none;
+  background: transparent;
+  color: #6c757d;
 
-  constructor(public authService: AuthService) {}
+  &:hover {
+    background: #f0f0f0;
+    color: #333;
+  }
+}
 
-  onToggleSidebar(): void {
-    this.toggleSidebar.emit();
+.avatar-circle {
+  width: 2.125rem;     // 34px
+  height: 2.125rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+// ── Mobile : masquer le nom ──
+.username-text {
+  @media (max-width: $breakpoint-sm) {
+    display: none !important;
+  }
+}
+
+// ── Mobile : masquer le texte logout ──
+.logout-text {
+  @media (max-width: $breakpoint-sm) {
+    display: none !important;
+  }
+}
+
+// ── Mobile : réduire padding navbar ──
+@media (max-width: $breakpoint-sm) {
+  .top-navbar {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
   }
 }
