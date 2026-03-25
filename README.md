@@ -1,44 +1,55 @@
-// src/app/app.ts
-import { Component, HostListener, OnInit } from '@angular/core';
-import { CommonModule }   from '@angular/common';
-import { RouterOutlet }   from '@angular/router';
-import { NavbarComponent }  from './shared/layout/navbar/navbar';
-import { SidebarComponent } from './shared/layout/sidebar/sidebar';
+// app.scss
+$navbar-height:            3.75rem;   // 60px
+$sidebar-width:            15rem;     // 240px
+$sidebar-collapsed-width:  4rem;      // 64px
+$breakpoint-md:            48em;      // 768px
+$breakpoint-sm:            36em;      // 576px
 
-@Component({
-  selector: 'app-root',
-  standalone: true,
-  imports: [CommonModule, RouterOutlet, NavbarComponent, SidebarComponent],
-  templateUrl: './app.html',
-  styleUrl:    './app.scss'
-})
-export class AppComponent implements OnInit {
+// ── Layout global ──
+.app-container {
+  min-height: 100vh;
+  background: #f5f7fa;
+}
 
-  sidebarCollapsed = false;
-  isMobile         = false;
+.app-body {
+  display: flex;
+  padding-top: $navbar-height;
+  min-height: calc(100vh - #{$navbar-height});
+}
 
-  // ── Détecte la taille d'écran au resize ──
-  @HostListener('window:resize')
-  onResize(): void {
-    this.isMobile = window.innerWidth <= 768;
-    // Sur tablette/mobile → sidebar fermée par défaut
-    if (this.isMobile) {
-      this.sidebarCollapsed = true;
-    }
+// ── Zone de contenu ──
+.app-content {
+  flex: 1;
+  margin-left: $sidebar-width;
+  padding: 1.5rem;
+  transition: margin-left 0.25s ease;
+  min-height: calc(100vh - #{$navbar-height});
+
+  &.sidebar-collapsed {
+    margin-left: $sidebar-collapsed-width;
   }
 
-  ngOnInit(): void {
-    this.onResize(); // applique dès le démarrage
+  @media (max-width: $breakpoint-md) {
+    margin-left: 0 !important;
+    padding: 1rem;
   }
 
-  onToggleSidebar(): void {
-    this.sidebarCollapsed = !this.sidebarCollapsed;
+  @media (max-width: $breakpoint-sm) {
+    padding: 0.75rem;
   }
+}
 
-  // Ferme la sidebar quand on clique sur l'overlay (mobile)
-  onOverlayClick(): void {
-    if (this.isMobile) {
-      this.sidebarCollapsed = true;
+// ── Overlay mobile ──
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1015;
+
+  @media (max-width: $breakpoint-md) {
+    &.active {
+      display: block;
     }
   }
 }
