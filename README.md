@@ -1,58 +1,69 @@
-// navbar.scss
-$navbar-height: 3.75rem;  // 60px
-$breakpoint-sm: 36em;     // 576px
+// navbar.spec.ts
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal, computed }          from '@angular/core';
+import { NavbarComponent }           from './navbar';
+import { AuthService }               from '../../../core/services/auth.service';
+import { provideRouter }             from '@angular/router';
 
-.top-navbar {
-  height: $navbar-height;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1030;
-  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.08);
+function createAuthMock(loggedIn = true) {
+  const _user = signal(loggedIn ? { preferred_username: 'john' } : null);
+  return {
+    isLoggedIn: computed(() => _user() !== null),
+    username:   computed(() => (_user() as any)?.preferred_username ?? ''),
+    logout:     jasmine.createSpy('logout')
+  };
 }
 
-.toggle-btn {
-  border: none;
-  background: transparent;
-  color: #6c757d;
+describe('NavbarComponent', () => {
+  let component: NavbarComponent;
+  let fixture:   ComponentFixture<NavbarComponent>;
+  let authMock:  ReturnType<typeof createAuthMock>;
 
-  &:hover {
-    background: #f0f0f0;
-    color: #333;
-  }
-}
+  beforeEach(async () => {
+    authMock = createAuthMock();
 
-.avatar-circle {
-  width: 2.125rem;     // 34px
-  height: 2.125rem;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.85rem;
-  font-weight: 700;
-  flex-shrink: 0;
-}
+    await TestBed.configureTestingModule({
+      imports: [NavbarComponent],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: authMock }
+      ]
+    }).compileComponents();
 
-// ── Mobile : masquer le nom ──
-.username-text {
-  @media (max-width: $breakpoint-sm) {
-    display: none !important;
-  }
-}
+    fixture   = TestBed.createComponent(NavbarComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
 
-// ── Mobile : masquer le texte logout ──
-.logout-text {
-  @media (max-width: $breakpoint-sm) {
-    display: none !important;
-  }
-}
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
 
-// ── Mobile : réduire padding navbar ──
-@media (max-width: $breakpoint-sm) {
-  .top-navbar {
-    padding-left: 0.5rem !important;
-    padding-right: 0.5rem !important;
-  }
-}
+  it('should display brand name', () => {
+    const brand = fixture.nativeElement.querySelector('.navbar-brand');
+    expect(brand.textContent).toContain('Fleet Management');
+  });
+
+  it('should display username when logged in', () => {
+    const content = fixture.nativeElement.textContent;
+    expect(content).toContain('john');
+  });
+
+  it('should show avatar with first letter of username', () => {
+    const avatar = fixture.nativeElement.querySelector('.avatar-circle');
+    expect(avatar.textContent.trim()).toBe('J');
+  });
+
+  it('should emit toggleSidebar when button clicked', () => {
+    spyOn(component.toggleSidebar, 'emit');
+    const btn = fixture.nativeElement.querySelector('.toggle-btn');
+    btn.click();
+    expect(component.toggleSidebar.emit).toHaveBeenCalled();
+  });
+
+  it('should call logout when button clicked', () => {
+    const btn = fixture.nativeElement.querySelector('.btn-outline-danger');
+    btn.click();
+    expect(authMock.logout).toHaveBeenCalled();
+  });
+});
