@@ -1,82 +1,62 @@
-// sidebar.scss
-$sidebar-width:            15rem;    // 240px
-$sidebar-collapsed-width:  4rem;     // 64px
-$navbar-height:            3.75rem;  // 60px
-$breakpoint-md:            48em;     // 768px
+// sidebar.spec.ts
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { SidebarComponent }          from './sidebar';
+import { provideRouter }             from '@angular/router';
 
-.sidebar {
-  position: fixed;
-  top: $navbar-height;
-  left: 0;
-  bottom: 0;
-  width: $sidebar-width;
-  overflow-x: hidden;
-  overflow-y: auto;
-  transition: width 0.25s ease, transform 0.25s ease;
-  z-index: 1020;
-  box-shadow: 0.125rem 0 0.5rem rgba(0, 0, 0, 0.06);
-  background: #fff;
+describe('SidebarComponent', () => {
+  let component: SidebarComponent;
+  let fixture:   ComponentFixture<SidebarComponent>;
 
-  // ── Desktop collapsed ──
-  &.collapsed:not(.mobile) {
-    width: $sidebar-collapsed-width;
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [SidebarComponent],
+      providers: [provideRouter([])]
+    }).compileComponents();
 
-    .sidebar-label {
-      opacity: 0;
-      pointer-events: none;
-      width: 0;
-    }
-  }
+    fixture   = TestBed.createComponent(SidebarComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
 
-  // ── Mobile : slide in/out ──
-  &.mobile {
-    width: $sidebar-width;
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
 
-    &.collapsed {
-      transform: translateX(-100%);
-    }
+  it('should render all menu items', () => {
+    const links = fixture.nativeElement.querySelectorAll('.sidebar-link');
+    expect(links.length).toBe(component.menuItems.length);
+  });
 
-    &:not(.collapsed) {
-      transform: translateX(0);
-    }
-  }
-}
+  it('should show labels when not collapsed', () => {
+    component.collapsed = false;
+    fixture.detectChanges();
+    const labels = fixture.nativeElement.querySelectorAll('.sidebar-label');
+    expect(labels.length).toBe(component.menuItems.length);
+  });
 
-// ── Navigation ──
-.sidebar-nav {
-  padding-top: 0.5rem;
-}
+  it('should hide labels when collapsed', () => {
+    component.collapsed = true;
+    fixture.detectChanges();
+    const labels = fixture.nativeElement.querySelectorAll('.sidebar-label');
+    expect(labels.length).toBe(0);
+  });
 
-.sidebar-link {
-  color: #495057;
-  padding: 0.625rem 0.75rem;   // 10px 12px
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: background 0.15s, color 0.15s;
-  white-space: nowrap;
+  it('should add collapsed class when collapsed', () => {
+    component.collapsed = true;
+    fixture.detectChanges();
+    const aside = fixture.nativeElement.querySelector('.sidebar');
+    expect(aside.classList).toContain('collapsed');
+  });
 
-  &:hover {
-    background: #f0f4ff;
-    color: #0d6efd;
-    i { color: #0d6efd; }
-  }
+  it('should contain Dashboard menu item', () => {
+    const item = component.menuItems.find(m => m.label === 'Dashboard');
+    expect(item).toBeTruthy();
+    expect(item?.route).toBe('/dashboard');
+  });
 
-  &.active {
-    background: #e8efff;
-    color: #0d6efd;
-    font-weight: 600;
-    i { color: #0d6efd; }
-  }
-
-  i {
-    color: #6c757d;
-    transition: color 0.15s;
-    min-width: 1.25rem;   // 20px
-    text-align: center;
-  }
-}
-
-.sidebar-label {
-  transition: opacity 0.2s ease, width 0.2s ease;
-  overflow: hidden;
-}
+  it('should contain Paramètres menu item', () => {
+    const item = component.menuItems.find(m => m.label === 'Paramètres');
+    expect(item).toBeTruthy();
+    expect(item?.route).toBe('/parametres');
+  });
+});
