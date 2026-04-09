@@ -1,0 +1,136 @@
+@startuml microservice_detail
+!theme cerulean
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 12
+skinparam roundcorner 15
+skinparam shadowing true
+
+title <b>Architecture Interne du Microservice Collector</b>\n
+
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #2E7D32
+}
+
+rectangle "MQTT Broker (Mosquitto)" as BROKER #FFE082 {
+  queue "raw/train/+/speed" as Q1 #FFF9C4
+  queue "raw/train/+/position" as Q2 #FFF9C4
+  queue "raw/train/+/brake" as Q3 #FFF9C4
+  queue "raw/train/+/door" as Q4 #FFF9C4
+  queue "raw/train/+/temperature" as Q5 #FFF9C4
+  queue "processed/train/+/speed" as PQ1 #C8E6C9
+  queue "processed/train/+/alerts" as PQ2 #FFCDD2
+  queue "processed/fleet/overview" as PQ3 #C8E6C9
+}
+
+package "Microservice Collector" as MS #E8F5E9 {
+  
+  package "1. Couche Ingestion" as L1 #F1F8E9 {
+    component "MQTT Client\n(paho-mqtt)" as CLIENT #A5D6A7
+    component "Message Router" as ROUTER #A5D6A7
+    component "Message Queue\n(interne)" as QUEUE #A5D6A7
+    
+    CLIENT --> ROUTER : raw message
+    ROUTER --> QUEUE : routed message
+    
+    note bottom of ROUTER
+      Route par type de topic:
+      speed → SpeedHandler
+      position → PositionHandler
+      brake → BrakeHandler
+      etc.
+    end note
+  }
+  
+  package "2. Couche Normalisation" as L2 #E8F5E9 {
+    component "Unit Converter" as UNIT #81C784
+    component "Noise Filter\n(lissage)" as NOISE #81C784
+    component "Schema Validator" as VALID #81C784
+    component "Timestamp\nSynchronizer" as TSYNC #81C784
+    
+    QUEUE --> VALID : raw data
+    VALID --> UNIT : validated
+    UNIT --> NOISE : converted
+    NOISE --> TSYNC : filtered
+    
+    note bottom of UNIT
+      - km/h ↔ m/s
+      - bar ↔ psi
+      - °C ↔ °F
+    end note
+    
+    note bottom of NOISE
+      - Moving average
+      - Outlier detection
+      - Data smoothing
+    end note
+  }
+  
+  package "3. Couche Règles Métier" as L3 #C8E6C9 {
+    component "Speed Monitor" as SPEED_R #66BB6A
+    component "Brake Validator" as BRAKE_R #66BB6A
+    component "Position Tracker" as POS_R #66BB6A
+    component "Alert Generator" as ALERT #FF7043
+    component "Fleet Aggregator" as FLEET #66BB6A
+    
+    TSYNC --> SPEED_R
+    TSYNC --> BRAKE_R
+    TSYNC --> POS_R
+    
+    SPEED_R --> ALERT : threshold exceeded
+    BRAKE_R --> ALERT : anomaly detected
+    POS_R --> ALERT : deviation detected
+    
+    SPEED_R --> FLEET
+    BRAKE_R --> FLEET
+    POS_R --> FLEET
+    
+    note bottom of SPEED_R
+      - Vitesse max par zone
+      - Accélération anormale
+      - Décélération d'urgence
+    end note
+    
+    note bottom of ALERT
+      Niveaux: INFO, WARNING,
+      CRITICAL, EMERGENCY
+    end note
+  }
+  
+  package "4. Couche Publication" as L4 #A5D6A7 {
+    component "MQTT Publisher" as MPUB #43A047
+    component "InfluxDB Writer" as IW #388E3C
+    component "Payload Formatter\n(JSON)" as FORMAT #43A047
+    
+    FLEET --> FORMAT
+    ALERT --> FORMAT
+    FORMAT --> MPUB : formatted JSON
+    FORMAT --> IW : influx point
+  }
+}
+
+database "InfluxDB" as INFLUXDB #FFAB91
+
+' Connexions externes
+Q1 --> CLIENT
+Q2 --> CLIENT
+Q3 --> CLIENT
+Q4 --> CLIENT
+Q5 --> CLIENT
+
+MPUB --> PQ1 : processed data
+MPUB --> PQ2 : alerts
+MPUB --> PQ3 : fleet overview
+
+IW --> INFLUXDB : write
+
+legend right
+  |= Couche |= Responsabilité |
+  | <#A5D6A7> Ingestion | Réception, routage, buffering |
+  | <#81C784> Normalisation | Validation, conversion, filtrage |
+  | <#66BB6A> Règles Métier | Monitoring, alertes, agrégation |
+  | <#43A047> Publication | Formatage, diffusion, persistance |
+endlegend
+
+@enduml

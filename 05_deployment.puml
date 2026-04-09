@@ -1,0 +1,83 @@
+@startuml deployment
+!theme cerulean
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 12
+skinparam roundcorner 15
+skinparam shadowing true
+
+title <b>Diagramme de Déploiement - Docker Compose</b>\n
+
+node "Docker Host" as DOCKER #F5F5F5 {
+
+  node "docker-compose.yml" as COMPOSE #E0E0E0 {
+    
+    artifact "mosquitto:2.0" as MOSQ #FFE082 {
+      port "1883 (MQTT)" as P1883
+      port "9001 (WebSocket)" as P9001
+      file "mosquitto.conf" as MCONF
+      folder "data/" as MDATA
+    }
+    
+    artifact "simulator:latest\n(Python)" as SIMUL #90CAF9 {
+      component "train_simulator.py" as TSIM
+      file "config.yaml\n(trains, fréquence)" as SCONF
+    }
+    
+    artifact "collector:latest\n(Python)" as COLL #66BB6A {
+      component "main.py" as MAIN
+      component "normalizer.py" as NORMP
+      component "rules_engine.py" as RULESP
+      component "publisher.py" as PUBP
+      file "rules.yaml\n(seuils, zones)" as RCONF
+    }
+    
+    artifact "influxdb:2.7" as INFLUX #FFAB91 {
+      port "8086 (HTTP API)" as P8086
+      database "railway_monitoring" as DB
+      folder "influxdb-data/" as IDATA
+    }
+    
+    artifact "grafana:latest" as GRAF #CE93D8 {
+      port "3000 (Web UI)" as P3000
+      component "MQTT Datasource\nPlugin" as MQTTPLUGIN
+      component "InfluxDB\nDatasource" as INFLUXPLUGIN
+      folder "dashboards/" as DASHDIR
+      file "provisioning/" as PROV
+    }
+    
+  }
+}
+
+cloud "Navigateur Web" as BROWSER #E3F2FD
+
+' Connexions réseau
+SIMUL -[#1976D2]-> P1883 : publish raw/*
+COLL -[#2E7D32]-> P1883 : subscribe raw/*\npublish processed/*
+COLL -[#E65100]-> P8086 : write API
+MQTTPLUGIN -[#7B1FA2]-> P9001 : WebSocket
+INFLUXPLUGIN -[#7B1FA2]-> P8086 : query API
+BROWSER -[#1976D2,bold]-> P3000 : HTTP :3000
+
+note right of COMPOSE
+  <b>Réseau Docker interne:</b>
+  railway-net (bridge)
+  
+  Tous les services communiquent
+  via noms de service Docker :
+  - mosquitto:1883
+  - influxdb:8086
+  - grafana:3000
+end note
+
+note bottom of COLL
+  <b>Variables d'environnement:</b>
+  MQTT_HOST=mosquitto
+  MQTT_PORT=1883
+  INFLUX_URL=http://influxdb:8086
+  INFLUX_TOKEN=xxx
+  INFLUX_ORG=railway
+  INFLUX_BUCKET=monitoring
+end note
+
+@enduml

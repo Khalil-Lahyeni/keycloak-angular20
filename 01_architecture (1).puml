@@ -1,0 +1,102 @@
+@startuml architecture_globale
+!theme cerulean
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 13
+skinparam roundcorner 15
+skinparam shadowing true
+skinparam componentStyle rectangle
+
+title <b>Architecture Globale - Système de Monitoring Ferroviaire Temps Réel</b>\n
+
+skinparam package {
+  BackgroundColor #E8F4FD
+  BorderColor #2196F3
+  FontColor #1565C0
+}
+
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+}
+
+skinparam database {
+  BackgroundColor #FFF3E0
+  BorderColor #EF6C00
+}
+
+package "Simulateur Ferroviaire" as SIM #E3F2FD {
+  component "Train Simulator\n(Device Emulator)" as TSIM #BBDEFB
+  component "Train 1" as T1 #90CAF9
+  component "Train 2" as T2 #90CAF9
+  component "Train N" as TN #90CAF9
+  
+  TSIM --> T1
+  TSIM --> T2
+  TSIM --> TN
+}
+
+package "Message Broker" as BROKER #FFF8E1 {
+  component "Mosquitto\nMQTT Broker" as MQTT #FFE082
+  
+  note right of MQTT
+    <b>Topics Bruts:</b>
+    raw/train/{id}/speed
+    raw/train/{id}/position
+    raw/train/{id}/brake
+    raw/train/{id}/door
+    raw/train/{id}/temperature
+  end note
+}
+
+package "Microservice Collector" as MS #E8F5E9 {
+  component "MQTT Consumer" as CONSUMER #A5D6A7
+  component "Normalizer" as NORM #81C784
+  component "Rule Engine\n(Règles Métier)" as RULES #66BB6A
+  component "Data Enricher" as ENRICH #4CAF50
+  component "MQTT Publisher" as PUB #43A047
+  component "InfluxDB Writer" as INFLUX_W #388E3C
+  
+  CONSUMER --> NORM
+  NORM --> RULES
+  RULES --> ENRICH
+  ENRICH --> PUB
+  ENRICH --> INFLUX_W
+}
+
+package "Stockage" as STORAGE #FBE9E7 {
+  database "InfluxDB\n(Historique)" as INFLUXDB #FFAB91
+}
+
+package "Visualisation" as VIZ #F3E5F5 {
+  component "Grafana" as GRAFANA #CE93D8
+  component "Dashboard\nTemps Réel" as DASH_RT #BA68C8
+  component "Dashboard\nHistorique" as DASH_H #AB47BC
+  
+  GRAFANA --> DASH_RT
+  GRAFANA --> DASH_H
+}
+
+' Flux principaux
+T1 -[#1976D2,bold]-> MQTT : <color:#1976D2>publish raw data
+T2 -[#1976D2,bold]-> MQTT
+TN -[#1976D2,bold]-> MQTT
+
+MQTT -[#2E7D32,bold]-> CONSUMER : <color:#2E7D32>subscribe raw/*
+
+PUB -[#FF6F00,bold]-> MQTT : <color:#FF6F00>publish processed/*
+INFLUX_W -[#E65100,bold]-> INFLUXDB : <color:#E65100>write points
+
+MQTT -[#7B1FA2,bold]-> DASH_RT : <color:#7B1FA2>MQTT plugin\n(streaming)
+INFLUXDB -[#7B1FA2,bold]-> DASH_H : <color:#7B1FA2>InfluxDB datasource\n(query)
+
+legend right
+  |= Couleur |= Signification |
+  | <#BBDEFB> | Simulateur / Données brutes |
+  | <#FFE082> | Broker MQTT |
+  | <#66BB6A> | Microservice Collector |
+  | <#FFAB91> | Stockage Historique |
+  | <#CE93D8> | Visualisation Grafana |
+endlegend
+
+@enduml

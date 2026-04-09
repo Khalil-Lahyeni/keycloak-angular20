@@ -1,0 +1,98 @@
+@startuml sequence_flux
+!theme cerulean
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 12
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 10
+skinparam sequenceLifeLineBorderColor #546E7A
+
+title <b>Diagramme de Séquence - Flux de Données Temps Réel</b>\n
+
+actor "Train\nSimulator" as SIM #90CAF9
+participant "Mosquitto\nBroker" as MQTT #FFE082
+participant "MQTT\nConsumer" as CONS #A5D6A7
+participant "Normalizer" as NORM #81C784
+participant "Rule\nEngine" as RULES #66BB6A
+participant "Data\nEnricher" as ENRICH #4CAF50
+participant "MQTT\nPublisher" as PUB #43A047
+database "InfluxDB" as INFLUX #FFAB91
+participant "Grafana\nRT" as GRAF_RT #CE93D8
+participant "Grafana\nHistorique" as GRAF_H #BA68C8
+
+== Initialisation ==
+
+CONS -> MQTT : subscribe("raw/train/+/#")
+GRAF_RT -> MQTT : subscribe("processed/train/+/#")\nsubscribe("processed/fleet/#")
+
+== Flux de Données Continue ==
+
+group #E3F2FD Chaque seconde (ou selon fréquence)
+  SIM -> MQTT : publish("raw/train/T001/speed")\n{"value": 120.5, "ts": 1712345678}
+  SIM -> MQTT : publish("raw/train/T001/position")\n{"lat": 48.85, "lon": 2.35}
+  SIM -> MQTT : publish("raw/train/T001/brake")\n{"pressure": 4.2, "status": "released"}
+end
+
+MQTT -> CONS : message reçu\n(topic + payload)
+
+activate CONS #C8E6C9
+  CONS -> CONS : parse JSON\nvalider format
+  CONS -> NORM : raw_data
+  
+  activate NORM #C8E6C9
+    NORM -> NORM : conversion unités\nfiltrage bruit\ninterpolation
+    NORM --> CONS : normalized_data
+  deactivate NORM
+  
+  CONS -> RULES : normalized_data
+  
+  activate RULES #C8E6C9
+    RULES -> RULES : check vitesse max\ncheck pression freins\ncheck position valide\ncheck délai entre messages
+    
+    alt #FFEBEE Alerte détectée
+      RULES --> CONS : {data, alerts: ["OVERSPEED"]}
+    else #E8F5E9 Normal
+      RULES --> CONS : {data, alerts: []}
+    end
+  deactivate RULES
+  
+  CONS -> ENRICH : processed_data
+  
+  activate ENRICH #C8E6C9
+    ENRICH -> ENRICH : ajouter metadata\ncalculer KPIs\nformer payload final
+    ENRICH --> CONS : enriched_data
+  deactivate ENRICH
+  
+  ' Double sortie
+  CONS -> PUB : enriched_data
+  
+  activate PUB #C8E6C9
+    PUB -> MQTT : publish("processed/train/T001/speed")\n{"value": 120.5, "unit": "km/h",\n "normalized": true, "alert": false}
+    
+    alt #FFEBEE Si alerte
+      PUB -> MQTT : publish("processed/train/T001/alerts")\n{"type": "OVERSPEED", "severity": "HIGH"}
+    end
+  deactivate PUB
+  
+  CONS -> INFLUX : write enriched_data\n(measurement, tags, fields, timestamp)
+  
+deactivate CONS
+
+' Temps réel
+MQTT -[#7B1FA2]-> GRAF_RT : streaming push\n(via MQTT plugin)
+
+note over GRAF_RT #F3E5F5
+  Affichage instantané
+  < 100ms de latence
+end note
+
+' Historique
+GRAF_H -> INFLUX : query (SELECT ... FROM ... WHERE time > now() - 1h)
+INFLUX --> GRAF_H : time series data
+
+note over GRAF_H #F3E5F5
+  Courbes historiques
+  Agrégations, moyennes
+end note
+
+@enduml

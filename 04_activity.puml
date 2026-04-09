@@ -1,0 +1,118 @@
+@startuml activity_pipeline
+!theme cerulean
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 12
+skinparam ActivityBackgroundColor #E8F5E9
+skinparam ActivityBorderColor #2E7D32
+skinparam ActivityDiamondBackgroundColor #FFF9C4
+skinparam ActivityDiamondBorderColor #F57F17
+
+title <b>Pipeline de Traitement - Microservice Collector</b>\n
+
+start
+
+:Réception message MQTT\n(topic + payload);
+
+partition "**Validation**" #F1F8E9 {
+  :Parser le JSON payload;
+  
+  if (JSON valide ?) then (oui)
+    :Extraire train_id,\ntype_mesure, valeur, timestamp;
+  else (non)
+    #FFCDD2:Logger erreur\n"Invalid JSON";
+    stop
+  endif
+  
+  if (Schema conforme ?) then (oui)
+    :Message validé;
+  else (non)
+    #FFCDD2:Logger erreur\n"Schema mismatch";
+    stop
+  endif
+}
+
+partition "**Normalisation**" #E8F5E9 {
+  :Synchroniser timestamp\n(UTC + correction drift);
+  
+  :Convertir unités\n(km/h, bar, °C);
+  
+  :Appliquer filtre de bruit\n(moving average window=5);
+  
+  if (Valeur dans plage physique ?) then (oui)
+    :Valeur normalisée OK;
+  else (non)
+    #FFF3E0:Marquer comme "suspect"\n(flag: OUTLIER);
+  endif
+}
+
+partition "**Règles Métier**" #C8E6C9 {
+  fork
+    :Vérifier seuils de vitesse\npar zone géographique;
+    
+    if (Vitesse > seuil zone ?) then (oui)
+      #FFCDD2:Générer alerte\n**OVERSPEED**\nseverity: CRITICAL;
+    else (non)
+    endif
+    
+  fork again
+    :Vérifier pression freins;
+    
+    if (Pression < minimum ?) then (oui)
+      #FFCDD2:Générer alerte\n**BRAKE_FAILURE**\nseverity: EMERGENCY;
+    else (non)
+    endif
+    
+  fork again
+    :Vérifier position GPS\nvs trajet prévu;
+    
+    if (Déviation > 100m ?) then (oui)
+      #FFF3E0:Générer alerte\n**ROUTE_DEVIATION**\nseverity: WARNING;
+    else (non)
+    endif
+    
+  fork again
+    :Vérifier délai entre\nmessages (heartbeat);
+    
+    if (Délai > 30s ?) then (oui)
+      #FFF3E0:Générer alerte\n**CONNECTION_LOST**\nseverity: WARNING;
+    else (non)
+    endif
+    
+  end fork
+  
+  :Agréger état global du train\n(calculer score santé);
+  
+  :Mettre à jour vue flotte\n(fleet overview);
+}
+
+partition "**Publication**" #A5D6A7 {
+  fork
+    :Formatter payload JSON\npour MQTT;
+    :Publier sur topic\nprocessed/train/{id}/*;
+    
+    if (Alertes présentes ?) then (oui)
+      :Publier sur topic\nprocessed/train/{id}/alerts;
+    endif
+    
+    :Publier sur\nprocessed/fleet/overview;
+    
+  fork again
+    :Formatter InfluxDB Point\n(measurement, tags, fields);
+    :Écrire dans InfluxDB\n(batch write);
+  end fork
+}
+
+#CE93D8:Grafana reçoit en temps réel\nvia MQTT plugin + InfluxDB;
+
+stop
+
+legend right
+  |= Symbole |= Signification |
+  | <#FFCDD2> | Erreur / Alerte critique |
+  | <#FFF3E0> | Warning / Suspect |
+  | <#E8F5E9> | Traitement normal |
+  | <#CE93D8> | Sortie vers Grafana |
+endlegend
+
+@enduml
