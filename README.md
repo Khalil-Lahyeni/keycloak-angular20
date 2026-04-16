@@ -1,46 +1,30 @@
-private ServerLogoutSuccessHandler oidcAndLocalLogoutHandler() {
-    OidcClientInitiatedServerLogoutSuccessHandler oidc =
-            new OidcClientInitiatedServerLogoutSuccessHandler(clientRegistrationRepository);
+public WebFilter grafanaAuthHeaderFilter() {
+        return (exchange, chain) -> {
+            String path = exchange.getRequest().getPath().value();
 
-    oidc.setPostLogoutRedirectUri("{baseUrl}");
-
-    return (exchange, authentication) -> {
-        // Log 1 : Vérifier le type d'authentication
-        System.out.println("=== LOGOUT DEBUG ===");
-        System.out.println("Authentication type: " + (authentication != null ? authentication.getClass().getName() : "NULL"));
-
-        if (authentication instanceof org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken oauthToken) {
-            System.out.println("Principal type: " + oauthToken.getPrincipal().getClass().getName());
-
-            if (oauthToken.getPrincipal() instanceof org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser) {
-                String idToken = oidcUser.getIdToken().getTokenValue();
-                System.out.println("id_token PRESENT: " + (idToken != null));
-                System.out.println("id_token (premiers 50 chars): " + (idToken != null ? idToken.substring(0, Math.min(50, idToken.length())) : "NULL"));
-            } else {
-                System.out.println("WARNING: Principal is NOT OidcUser -> pas de id_token !");
+            // Applique uniquement sur les routes /grafana/**
+            if (!path.startsWith("/grafana/") && !path.equals("/grafana")) {
+                return chain.filter(exchange);
             }
-        } else {
-            System.out.println("WARNING: Authentication is NOT OAuth2AuthenticationToken !");
-        }
 
-        // Log 2 : Vérifier la session
-        return exchange.getExchange().getSession()
-                .doOnNext(session -> {
-                    System.out.println("Session ID: " + session.getId());
-                    System.out.println("Session attributes: " + session.getAttributes().keySet());
-                    session.getAttributes().forEach((key, value) ->
-                            System.out.println("  " + key + " -> " + value.getClass().getName()));
-                })
-                .then(oidc.onLogoutSuccess(exchange, authentication))
-                .then(exchange.getExchange().getSession()
-                        .flatMap(WebSession::invalidate))
-                .then(Mono.fromRunnable(() -> {
-                    exchange.getExchange().getResponse().addCookie(
-                            ResponseCookie.from("SESSION", "")
-                                    .path("/")
-                                    .maxAge(0)
-                                    .httpOnly(true)
-                                    .build());
-                }));
-    };
-}
+            return ReactiveSecurityContextHolder.getContext()
+                    .map(ctx -> ctx.getAuthentication())
+                    .flatMap(auth -> {
+                        String username = auth.getName();
+
+                        // Mutate la requête pour ajouter le header X-WEBAUTH-USER
+                        var mutatedRequest = exchange.getRequest()
+                                .mutate()
+                                .header("X-WEBAUTH-USER", username)
+                                .build();
+
+                        var mutatedExchange = exchange.mutate()
+                                .request(mutatedRequest)
+                                .build();
+
+                        return chain.filter(mutatedExchange);
+                    })
+                    // Si pas d'auth (ne devrait pas arriver car /grafana est protégé)
+                    .switchIfEmpty(chain.filter(exchange));
+        };
+    }
