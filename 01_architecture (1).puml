@@ -1,102 +1,113 @@
-@startuml architecture_globale
-!theme cerulean
-skinparam backgroundColor #FAFAFA
-skinparam defaultFontName Segoe UI
-skinparam defaultFontSize 13
-skinparam roundcorner 15
-skinparam shadowing true
-skinparam componentStyle rectangle
+Une alerte ne peut pas être générée à partir d’un simple snapshot, car un snapshot ne reflète qu’un instantané des données et ne permet pas de détecter les tendances ou anomalies.
+Mon objectif est donc de créer des features basées sur une période historique de durée X, afin de permettre au modèle de prédire et générer des alertes de manière fiable.
 
-title <b>Architecture Globale - Système de Monitoring Ferroviaire Temps Réel</b>\n
+CHAT:
+Vous avez tout à fait raison : une panne est rarement un événement isolé, c'est souvent l'aboutissement d'une dégradation progressive. Pour que votre modèle soit prédictif (et non simplement réactif), nous devons passer d'une vision "statique" à une vision "fenêtrée" (Time-Series Windowing).Voici comment structurer la Step 1 pour transformer vos données en séries temporelles exploitables.1. Stratégie de "Sliding Window" (Fenêtre Glissante)Pour chaque train, nous allons définir une fenêtre de durée X (ex: les 24 dernières heures) pour calculer des agrégats qui serviront de features.A. Features de Stabilité (Variabilité des statuts)Au lieu de prendre le pacisStatus actuel, on analyse sa fréquence sur la période X :Status Volatility : Nombre de changements d'état (ex: passer de ok à partially_ok puis revenir à ok) sur la période X. Une haute volatilité indique souvent un capteur ou un composant en fin de vie.Failure Duty Cycle : Pourcentage de temps passé en état failure ou communication_lost sur la période X.B. Features de Tendance (Tendances de données)Error Momentum : Est-ce que le nombre de messages d'erreur dans messages augmente entre la première moitié et la seconde moitié de la fenêtre X ?Update Latency Trend : Si le updateStatus reste en Pending alors que la baseline a changé plusieurs fois pour les autres trains, cela devient une feature de risque critique.C. Features de Corrélation ÉvénementielleOn croise les deux fichiers pour détecter des patterns :Alarm-to-Failure Lag : Temps moyen entre l'apparition d'une alerte "Intercommunication requested" (PEI) et une dégradation du pacisStatus.Media-DB Pressure : Nombre de versions de bases de données activées/désactivées sur la période X. Des cycles fréquents de is_active: true/false peuvent indiquer des tentatives de récupération système après crash.2. Structure du Dataset Transformé (Exemple)Chaque ligne de votre dataset d'entraînement ne sera plus "Un Train", mais "Un Train sur une période donnée".
 
-skinparam package {
-  BackgroundColor #E8F4FD
-  BorderColor #2196F3
-  FontColor #1565C0
-}
+3. Préparation Technique : L'Aplatissement (Flattening)
+Comme vos données sont imbriquées (notamment les versions dans media-databases et les messages), la première étape technique consiste à créer une table de logs chronologiques unique :
 
-skinparam component {
-  BackgroundColor #FFFFFF
-  BorderColor #546E7A
-}
+Extraction : Sortir chaque message et chaque changement de statut avec son timestamp.
 
-skinparam database {
-  BackgroundColor #FFF3E0
-  BorderColor #EF6C00
-}
+Ré-échantillonnage (Resampling) : Normaliser les données (ex: un point toutes les 5 minutes) pour combler les trous de communication.
 
-package "Simulateur Ferroviaire" as SIM #E3F2FD {
-  component "Train Simulator\n(Device Emulator)" as TSIM #BBDEFB
-  component "Train 1" as T1 #90CAF9
-  component "Train 2" as T2 #90CAF9
-  component "Train N" as TN #90CAF9
-  
-  TSIM --> T1
-  TSIM --> T2
-  TSIM --> TN
-}
+Agrégation : Appliquer les fonctions count(), mean(), ou std() sur votre fenêtre X.
 
-package "Message Broker" as BROKER #FFF8E1 {
-  component "Mosquitto\nMQTT Broker" as MQTT #FFE082
-  
-  note right of MQTT
-    <b>Topics Bruts:</b>
-    raw/train/{id}/speed
-    raw/train/{id}/position
-    raw/train/{id}/brake
-    raw/train/{id}/door
-    raw/train/{id}/temperature
-  end note
-}
+Vers la Step 2 (Le Labelling)
+Pour préparer l'étape suivante, il faudra décider de la "Target" (ce que l'IA doit prédire). Est-ce :
 
-package "Microservice Collector" as MS #E8F5E9 {
-  component "MQTT Consumer" as CONSUMER #A5D6A7
-  component "Normalizer" as NORM #81C784
-  component "Rule Engine\n(Règles Métier)" as RULES #66BB6A
-  component "Data Enricher" as ENRICH #4CAF50
-  component "MQTT Publisher" as PUB #43A047
-  component "InfluxDB Writer" as INFLUX_W #388E3C
-  
-  CONSUMER --> NORM
-  NORM --> RULES
-  RULES --> ENRICH
-  ENRICH --> PUB
-  ENRICH --> INFLUX_W
-}
+Une classification binaire : "Y aura-t-il une panne totale dans les prochaines Y heures ?"
 
-package "Stockage" as STORAGE #FBE9E7 {
-  database "InfluxDB\n(Historique)" as INFLUXDB #FFAB91
-}
+Un score de santé (RUL - Remaining Useful Life) : "Combien de temps avant la prochaine défaillance ?"
 
-package "Visualisation" as VIZ #F3E5F5 {
-  component "Grafana" as GRAFANA #CE93D8
-  component "Dashboard\nTemps Réel" as DASH_RT #BA68C8
-  component "Dashboard\nHistorique" as DASH_H #AB47BC
-  
-  GRAFANA --> DASH_RT
-  GRAFANA --> DASH_H
-}
+Quelle durée X semble la plus pertinente pour vos opérations (ex: 6h, 24h, 1 semaine) ?
 
-' Flux principaux
-T1 -[#1976D2,bold]-> MQTT : <color:#1976D2>publish raw data
-T2 -[#1976D2,bold]-> MQTT
-TN -[#1976D2,bold]-> MQTT
+KHALIL 
+Ok, merci pour tes idées. Concentrons-nous une par une :
 
-MQTT -[#2E7D32,bold]-> CONSUMER : <color:#2E7D32>subscribe raw/*
+Features de stabilité (variabilité des statuts)
+Failure Duty Cycle
+Quels sont les attributs de ma base de données que je peux utiliser pour appliquer ces stratégies ?
+et comment on peux construire ces variabilité depuis ma db  ? 
+CHAT:
+C'est une excellente approche. Pour passer de données statiques à des indicateurs de tendance, nous allons isoler les attributs qui sont des témoins d'état (ceux qui changent quand le train va mal).
 
-PUB -[#FF6F00,bold]-> MQTT : <color:#FF6F00>publish processed/*
-INFLUX_W -[#E65100,bold]-> INFLUXDB : <color:#E65100>write points
+Voici comment mapper votre base de données actuelle vers ces deux stratégies de stabilité :
+1. Identification des Attributs Clés
+Dans votre fichier sample_db.json, les attributs "cibles" pour mesurer la stabilité sont :
 
-MQTT -[#7B1FA2,bold]-> DASH_RT : <color:#7B1FA2>MQTT plugin\n(streaming)
-INFLUXDB -[#7B1FA2,bold]-> DASH_H : <color:#7B1FA2>InfluxDB datasource\n(query)
+pacisStatus : L'état du système d'information passagers.
 
-legend right
-  |= Couleur |= Signification |
-  | <#BBDEFB> | Simulateur / Données brutes |
-  | <#FFE082> | Broker MQTT |
-  | <#66BB6A> | Microservice Collector |
-  | <#FFAB91> | Stockage Historique |
-  | <#CE93D8> | Visualisation Grafana |
-endlegend
+cctvStatus : L'état du système de vidéosurveillance.
 
-@enduml
+rearViewStatus : L'état de la rétrovision (crucial pour la sécurité).
+
+updateStatus : Indique si le train est à jour ou en attente (Pending).
+
+Ces attributs utilisent des valeurs qualitatives (ex: ok, failure, partially_ok, communication_lost) que nous devons transformer en données temporelles.
+
+2. Construction de la "Status Volatility"
+La volatilité mesure le nombre de fois où un système change d'état sur une période X. Un système stable reste à ok. Un système défaillant oscille.
+
+Comment la construire :
+
+Extraction chronologique : Pour un trainId donné, vous extrayez tous les pacisStatus enregistrés dans votre historique.
+
+Calcul de delta : Vous comptez le nombre de transitions où Status 
+t
+​
+ 
+
+=Status 
+t−1
+​
+ .
+
+Normalisation : Vous divisez ce nombre par la durée de la fenêtre X.
+
+Exemple concret : Si le train T-002 passe de failure à ok puis à nouveau failure trois fois en 2 heures, sa volatilité est très élevée (6 changements), ce qui suggère un faux contact ou un bug logiciel cyclique plutôt qu'une panne franche.
+
+3. Construction du "Failure Duty Cycle"
+Le Duty Cycle représente le pourcentage de temps passé dans un état dégradé sur la période X.
+
+Formule :
+
+Failure_Duty_Cycle= 
+Dur 
+e
+ˊ
+ e totale de la fen 
+e
+ˆ
+ tre X
+∑Dur 
+e
+ˊ
+ e des  
+e
+ˊ
+ tats (failure + communication_lost + partially_ok)
+​
+ ×100
+Comment la construire depuis votre DB :
+
+Étape A : Définissez les états "négatifs". Dans vos données, ce sont failure, communication_lost et potentiellement partially_ok.
+
+Étape B : Calculez le temps écoulé entre deux timestamps (lastSeen).
+
+Étape C : Cumulez le temps passé dans ces états négatifs.
+
+Interprétation :
+
+0% : Le train est parfaitement sain.
+
+100% : Le train est en panne totale constante.
+
+15% : Le train subit des micro-coupures (souvent indétectables sans cette feature).
+
+4. Schéma de transformation des données
+Pour construire cela, votre script de préparation de données doit "aplatir" les logs comme ceci :
+
+Ensuite, vous appliquez une fenêtre glissante (rolling window) sur la colonne "Valeur Numérique" pour obtenir votre moyenne (Duty Cycle) ou votre somme de changements (Volatilité).
+
+Souhaitez-vous que je vous montre un exemple de code Python pour calculer ce Failure Duty Cycle à partir de votre structure JSON ?
