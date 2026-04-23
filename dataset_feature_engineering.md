@@ -83,7 +83,22 @@ Ces features ne changent pas dans le temps mais **modulent la criticité** :
 
 ---
 
-### Catégorie 5 — Alertes passées (`TrainAlert`)
+### Catégorie 5 — Messages diffusés (`TrainMessage`)
+
+Les messages envoyés dans les trains (audio, LED, vidéo) reflètent l'état opérationnel et peuvent précéder ou accompagner des pannes :
+
+| Feature | Description | Pourquoi |
+|---|---|---|
+| `nb_messages_total` | Nombre total de messages sur X | Activité du système |
+| `nb_messages_audio` | Nombre de messages `AUDIO` | Annonces actives |
+| `nb_messages_led` | Nombre de messages `LED` | Alertes visuelles actives |
+| `nb_messages_tft_video` | Nombre de messages `TFT_VIDEO` | Affichage passagers actif |
+| `has_critical_message` | 1 si un message contient des mots-clés comme "Failure", "Brake", "Engine" | Contenu critique détecté |
+| `message_type_diversity` | Nombre de types distincts utilisés sur X | Variété des canaux actifs |
+
+---
+
+### Catégorie 6 — Alertes passées (`TrainAlert`)
 
 C'est la catégorie **la plus puissante** pour prédire une future alerte :
 
@@ -128,5 +143,6 @@ Ces deux paramètres déterminent la granularité de toutes les features tempore
 | Localisation | 3 |
 | Versions media | 5 |
 | Contexte statique | 5 |
+| Messages diffusés | 6 |
 | Alertes passées | 6 |
-| **Total** | **40** |
+| **Total** | **46** |
